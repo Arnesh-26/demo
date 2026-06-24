@@ -1,0 +1,27 @@
+# Python virtual environments
+.venv/
+.venv312/
+venv/
+ENV/
+env/
+
+# Python cache / compile files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# Local IDEs / System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Audio sample files (optional, but good practice since they are large)
+*.wav
+
+# System/Antigravity Generated Task Logs
+.system_generated/
+/brain/

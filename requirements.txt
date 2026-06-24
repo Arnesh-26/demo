@@ -1,0 +1,132 @@
+# =====================================================================
+# INSTALLATION INSTRUCTIONS (via Terminal)
+# =====================================================================
+#
+# IMPORTANT: Always use the venv Python directly (.venv312\Scripts\python.exe)
+#            to avoid accidentally using the system Python which lacks packages.
+#
+# Step 1: Create a Python 3.12 virtual environment:
+#    python -m venv .venv312
+#
+# Step 2: Activate the virtual environment:
+#    - Windows (PowerShell):  .\.venv312\Scripts\Activate.ps1
+#    - Windows (Cmd Prompt):  .\.venv312\Scripts\activate.bat
+#    - macOS / Linux:         source .venv312/bin/activate
+#
+# Step 3: Upgrade pip to the latest version:
+#    .\.venv312\Scripts\python.exe -m pip install --upgrade pip
+#
+# Step 4: Install all required packages:
+#    .\.venv312\Scripts\pip.exe install -r requirements.txt
+#
+# Step 5: (Windows Only - Troubleshooting) If PyAudio installation fails:
+#    .\.venv312\Scripts\pip.exe install pipwin
+#    pipwin install pyaudio
+#
+# =====================================================================
+# VERSION NOTES (torch / pyannote compatibility matrix)
+# =====================================================================
+#
+# pyannote.audio 4.x requires torch >= 2.8.0 AND pytorch-lightning 2.5.x
+# pytorch-lightning 2.5.x is incompatible with torch >= 2.12
+# Therefore: torch==2.8.0 and torchaudio==2.8.0 are the pinned versions.
+# Do NOT upgrade torch beyond 2.11.x unless you also upgrade pytorch-lightning.
+#
+# =====================================================================
+# HOW TO RUN LIVE TRANSCRIPTION (Step-by-Step)
+# =====================================================================
+#
+# Step 1: Create local environment configuration:
+#    - Copy the configuration template:
+#      On Windows:      copy .env.example .env
+#      On macOS/Linux:  cp .env.example .env
+#    - Open the new .env file and configure:
+#        CLINICAL_COPILOT_ELEVENLABS_API_KEY=<your_key>
+#        CLINICAL_COPILOT_STT_PROVIDER_MODE=production
+#        CLINICAL_COPILOT_HUGGINGFACE_TOKEN=<your_token>
+#        CLINICAL_COPILOT_DIARIZATION_MODE=production   <- or 'development' for mocks
+#
+# Step 2: Start the FastAPI Backend Server (Terminal 1):
+#    .\.venv312\Scripts\python.exe -m uvicorn app.main:app --port 8000
+#
+#    On first run with DIARIZATION_MODE=production, the server will
+#    automatically download the Pyannote speaker-diarization-3.1 model
+#    (~1 GB from HuggingFace). Subsequent starts use the local cache.
+#
+# Step 3: Stream Audio (Terminal 2 — open new terminal, activate venv):
+#
+#    Option A: Stream Live Microphone Input:
+#       .\.venv312\Scripts\python.exe stream_mic.py doctor
+#
+#    Option B: Stream a Pre-recorded WAV File:
+#       .\.venv312\Scripts\python.exe stream_audio.py speech-sample.wav doctor
+#
+#    Roles available: doctor | patient | attender
+#
+# Step 4: Fetch / Verify Captured Transcripts:
+#    - The streaming client terminal prints transcripts in real time.
+#    - Query the session transcript cache via HTTP at any time:
+#      http://127.0.0.1:8000/v1/transcripts/consultation-xyz-123
+#
+# Step 5: Health Check:
+#    http://127.0.0.1:8000/health
+#
+# =====================================================================
+# DIARIZATION MODES
+# =====================================================================
+#
+# development  ->  Mock speaker labels (Speaker_0/1/2). No model needed.
+#                  Use for local testing without a HuggingFace token.
+#
+# production   ->  Real Pyannote AI speaker diarization.
+#                  Requires CLINICAL_COPILOT_HUGGINGFACE_TOKEN in .env.
+#                  Downloads pyannote/speaker-diarization-3.1 on first run.
+#
+# =====================================================================
+
+# Core Framework & Web Server
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+websockets>=12.0
+PyJWT>=2.8.0
+python-dotenv>=1.0.0
+
+# Audio Processing & Live Streaming
+PyAudio>=0.2.14
+
+# Speaker Diarization (Pyannote & PyTorch)
+# ============================================================
+# CRITICAL: These versions are pinned to resolve THREE Windows-specific issues:
+#
+# Issue 1 — torch._dynamo circular import (torch >= 2.6.0)
+#   torch/_dynamo/utils.py defined NP_SUPPORTED_MODULES *after*
+#   'from . import config', which triggers a circular import chain.
+#   FIX: Moved NP_SUPPORTED_MODULES definition before that line in
+#        .venv312/Lib/site-packages/torch/_dynamo/utils.py
+#        (patch must be re-applied if torch is reinstalled).
+#
+# Issue 2 — numpy 2.x DLLs blocked by Windows App Control
+#   numpy 2.x compiles with Meson; its .pyd DLLs are not in the
+#   Windows trusted-publisher list on this machine.
+#   FIX: Pin to numpy 1.26.4 (distutils build, trusted DLLs).
+#
+# Issue 3 — pyannote 4.x requires numpy>=2.0
+#   Resolved by using pyannote.audio 3.3.2 + its 5.x sub-packages.
+#   Pipeline.from_pretrained("pyannote/speaker-diarization-3.1") API
+#   is identical between pyannote.audio 3.x and 4.x.
+#
+# Verified working on Python 3.12 / Windows 11:
+#   python -c "from pyannote.audio import Pipeline; print('OK')"
+#   → SUCCESS: from pyannote.audio import Pipeline - OK
+# ============================================================
+torch==2.8.0
+torchaudio==2.8.0
+numpy==1.26.4
+scipy==1.15.1
+pyannote.audio==3.3.2
+pyannote-core>=5.0.0,<6.0
+pyannote-pipeline>=3.0.1,<4.0
+pyannote-database>=5.0,<6.0
+soundfile>=0.12.0
